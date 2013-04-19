@@ -163,12 +163,12 @@ print_dict() {
                 read pinyin_index
                 pinyin_index="$(printf "obase=10;ibase=16;${pinyin_index}\n" | bc)"
                 pinyin_index="$(expr "${pinyin_index}" + 1)"
-                pinyin="${pinyin}$(sed -n -e "${pinyin_index}p" "${TEMP_PINYIN_TABLE}")"
+                pinyin="${pinyin} $(sed -n -e "${pinyin_index}p" "${TEMP_PINYIN_TABLE}")"
                 pinyin_len="$(expr "${pinyin_len}" - 1)"
             done
             while [ "${homophone_amount}" -gt 0 ]
             do
-                printf "${pinyin}\n"
+                printf "${pinyin}\n" | colrm 1 1
                 read chinese_phrase_len
                 chinese_phrase_len="$(printf "obase=10;ibase=16;${chinese_phrase_len}/2\n" | bc)"
                 while [ "${chinese_phrase_len}" -gt 0 ]
