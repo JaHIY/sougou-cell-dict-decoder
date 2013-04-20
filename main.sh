@@ -208,15 +208,15 @@ main() {
                 shift
             ;;
             '-h'|'--help')
-                print_help
-                break
+                print_usage
+                return 0
             ;;
             '--')
                 shift
                 break
             ;;
             *)
-                print_usage
+                print_error
                 return 3
             ;;
         esac
