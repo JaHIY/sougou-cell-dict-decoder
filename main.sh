@@ -56,9 +56,18 @@ clean_up() {
     [ $rm_code -eq 0 ] || err "[${rm_code}]${rm_err}"
 }
 
-clean_up_on_exit() {
+abort_msg() {
     printf '\n' 1>&2
     err 'Aborted by user! Exiting...'
+}
+
+abort_msg_on_exit() {
+    abort_msg
+    exit 4
+}
+
+clean_up_on_exit() {
+    abort_msg
     clean_up
     exit 1
 }
@@ -199,7 +208,7 @@ main() {
     local list_flag=0
     local my_umask='077'
     local old_umask="$(umask)"
-    trap 'clean_up_on_exit' HUP INT QUIT TERM
+    trap 'abort_msg_on_exit' HUP INT QUIT TERM
     while true
     do
         case "${1}" in
@@ -224,8 +233,16 @@ main() {
     if [ $# -le 0 ]
     then
         print_error
-    elif [ "${list_flag}" -eq 0 ]
+    elif [ "${list_flag}" -eq 1 ]
     then
+        while true
+        do
+            list_information "${1}"
+            shift
+            [ $# -gt 0 ] || break
+        done
+    else
+        trap 'clean_up_on_exit' HUP INT QUIT TERM
         while true
         do
             umask "$my_umask"
@@ -233,13 +250,6 @@ main() {
             umask "$old_umask"
             print_dict "${1}"
             clean_up
-            shift
-            [ $# -gt 0 ] || break
-        done
-    else
-        while true
-        do
-            list_information "${1}"
             shift
             [ $# -gt 0 ] || break
         done
