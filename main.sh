@@ -16,14 +16,41 @@ fi
 
 eval set -- "$ARGV"
 
-TEMP_PINYIN_TABLE="/tmp/pinyintable-$$.txt"
+TEMP_PINYIN_TABLE='/tmp/pinyintable-$$.txt'
+REVERSE_HEX_ORDER='s/^[[:space:]]*\([[:xdigit:]]\{2\}\)[[:space:]]\([[:xdigit:]]\{2\}\)$/\2\1/g'
+
+cols_to_single_col() {
+    awk '{ \
+            for(i=1;i<=NF;i++) { \
+                printf "%s\n",$i; \
+            } \
+        }'
+}
+
+single_col_to_cols() {
+    awk '{ \
+            j=NR%'"${1}"'; \
+            if(j != 1) { \
+                printf OFS; \
+            } \
+            printf "%s",$1; \
+            if(j == 0) { \
+                printf ORS; \
+            } \
+        } \
+        END{ \
+            if(NR%'"${1}"' != 0) { \
+                printf ORS; \
+            } \
+        }'
+}
 
 list_information() {
     printf '%s%s\n' \
-    '词库名：' "$(dict_info "${1}" '0x130' '0x208')" \
-    '词库类型：' "$(dict_info "${1}" '0x338' '0x208')" \
-    '描述信息：' "$(dict_info "${1}" '0x540' '0x800')" \
-    '词库示例：' "$(dict_info "${1}" '0xd40' '0x400')"
+    '词库名：' "$(dict_info "${1}" '0x130' '520')" \
+    '词库类型：' "$(dict_info "${1}" '0x338' '520')" \
+    '描述信息：' "$(dict_info "${1}" '0x540' '2048')" \
+    '词库示例：' "$(dict_info "${1}" '0xd40' '1024')"
 }
 
 print_usage() {
@@ -42,7 +69,7 @@ print_error() {
     local my_name="${0}"
     printf '%s\n' \
             "${my_name}: missing optstring argument" \
-            "Try \`${my_name} --help' for more information." 1>&2
+            "Try \`${my_name} -h' for more information." 1>&2
 }
 
 err() {
@@ -73,8 +100,8 @@ clean_up_on_exit() {
 }
 
 byte2str_core() {
-        local num_dec="$(printf "obase=10;ibase=16;${1}\n" | bc)"
-        local num_bin="$(printf "obase=2;ibase=16;${1}\n" | bc)"
+        local num_dec="$(printf '%s\n' "obase=10;ibase=16;${1}" | bc)"
+        local num_bin="$(printf '%s\n' "obase=2;ibase=16;${1}" | bc)"
         local first_part=''
         local sencond_part=''
         local third_part=''
@@ -82,17 +109,17 @@ byte2str_core() {
         #UTF-8    0xxxxxxx   110xxxxx 10xxxxxx   1110xxxx 10xxxxxx 10xxxxxx
         if [ "${num_dec}" -ge 0 ] && [ "${num_dec}" -le 127 ]
         then
-            num_bin="$(printf '%08d' "${num_bin}")"
+            num_bin="$(printf '%08d\n' "${num_bin}")"
             printf '%s\n' "${num_bin}"
         elif [ "${num_dec}" -ge 128 ] && [ "${num_dec}" -le 2047 ]
         then
-            num_bin="$(printf '%011d' "${num_bin}")"
+            num_bin="$(printf '%011d\n' "${num_bin}")"
             first_part="$(cut -c -5 <<< "${num_bin}")"
             sencond_part="$(cut -c 6- <<< "${num_bin}")"
             printf '%s\n' "110${first_part}" "10${sencond_part}"
         elif [ "${num_dec}" -ge 2048 ] && [ "${num_dec}" -le 65535 ]
         then
-            num_bin="$(printf '%016d' "${num_bin}")"
+            num_bin="$(printf '%016d\n' "${num_bin}")"
             first_part="$(cut -c -4 <<< "${num_bin}")"
             sencond_part="$(cut -c 5-10 <<< "${num_bin}")"
             third_part="$(cut -c 11- <<< "${num_bin}")"
@@ -104,7 +131,7 @@ after_byte2str_core() {
     local line=''
     printf '%b' "$(while read line
         do
-            printf '\\x%s' "$(printf "obase=16;ibase=2;${line}\n" | bc)"
+            printf '\\x%s' "$(printf '%s\n' "obase=16;ibase=2;${line}" | bc)"
         done | \
         sed -e 's/\\x0\{0,1\}[dD]/\\x0A/g')"
 }
@@ -119,8 +146,9 @@ byte2str() {
 }
 
 dict_info() {
-    od -An -tx1 -w2 -j "${2}" -N "${3}" -v "${1}" | \
-        sed -e 's/^[[:space:]]\([[:xdigit:]]\{2\}\)[[:space:]]\([[:xdigit:]]\{2\}\)$/\2\1/g' \
+    od -An -tx1 -j "${2}" -N "${3}" -v "${1}" | \
+        cols_to_single_col | single_col_to_cols 2 | \
+        sed -e "${REVERSE_HEX_ORDER}" \
             -e '/^0000$/d' | \
         tr '[:lower:]' '[:upper:]' | \
         byte2str
@@ -130,13 +158,14 @@ print_pinyin_table() {
     local index=''
     local len=''
     local pinyin=''
-    od -An -tx1 -w2 -j 0x1544 -N 0x10E4 -v "${1}" | \
-        sed -e 's/^[[:space:]]\([[:xdigit:]]\{2\}\)[[:space:]]\([[:xdigit:]]\{2\}\)$/\2\1/g' | \
+    od -An -tx1 -j 0x1544 -N 4324 -v "${1}" | \
+        cols_to_single_col | single_col_to_cols 2 | \
+        sed -e "${REVERSE_HEX_ORDER}" | \
         tr '[:lower:]' '[:upper:]' | \
         while read index
         do
             read len
-            len="$(printf "obase=10;ibase=16;${len}/2\n" | bc)"
+            len="$(printf '%s\n' "obase=10;ibase=16;${len}/2" | bc)"
             until [ "${len}" -eq 0 ]
             do
                 read pinyin
@@ -158,19 +187,20 @@ print_dict() {
     local chinese_char=''
     local extend_len=''
     local chinese_phrase_frequency=''
-    od -An -tx1 -w2 -j 0x2628 -v "${1}" | \
-        sed -e 's/^[[:space:]]\([[:xdigit:]]\{2\}\)[[:space:]]\([[:xdigit:]]\{2\}\)$/\2\1/g' | \
+    od -An -tx1 -j 0x2628 -v "${1}" | \
+        cols_to_single_col | single_col_to_cols 2 | \
+        sed -e "${REVERSE_HEX_ORDER}" | \
         tr '[:lower:]' '[:upper:]' | \
         while read line
         do
-            homophone_amount="$(printf "obase=10;ibase=16;${line}\n" | bc)"
+            homophone_amount="$(printf '%s\n' "obase=10;ibase=16;${line}" | bc)"
             read pinyin_len
-            pinyin_len="$(printf "obase=10;ibase=16;${pinyin_len}/2\n" | bc)"
+            pinyin_len="$(printf '%s\n' "obase=10;ibase=16;${pinyin_len}/2" | bc)"
             pinyin=''
             while [ "${pinyin_len}" -gt 0 ]
             do
                 read pinyin_index
-                pinyin_index="$(printf "obase=10;ibase=16;${pinyin_index}\n" | bc)"
+                pinyin_index="$(printf '%s\n' "obase=10;ibase=16;${pinyin_index}" | bc)"
                 pinyin_index="$(expr "${pinyin_index}" + 1)"
                 pinyin="${pinyin} $(sed -n -e "${pinyin_index}p" "${TEMP_PINYIN_TABLE}")"
                 pinyin_len="$(expr "${pinyin_len}" - 1)"
@@ -179,7 +209,7 @@ print_dict() {
             do
                 printf "${pinyin}\n" | colrm 1 1
                 read chinese_phrase_len
-                chinese_phrase_len="$(printf "obase=10;ibase=16;${chinese_phrase_len}/2\n" | bc)"
+                chinese_phrase_len="$(printf '%s\n' "obase=10;ibase=16;${chinese_phrase_len}/2" | bc)"
                 while [ "${chinese_phrase_len}" -gt 0 ]
                 do
                     read chinese_char
@@ -190,9 +220,9 @@ print_dict() {
                 printf '\n'
                 read extend_len
                 read chinese_phrase_frequency
-                printf "obase=10;ibase=16;${chinese_phrase_frequency}\n" | bc
+                printf '%s\n' "obase=10;ibase=16;${chinese_phrase_frequency}" | bc
                 printf '\n'
-                extend_len="$(printf "obase=10;ibase=16;${extend_len}/2\n" | bc)"
+                extend_len="$(printf '%s\n' "obase=10;ibase=16;${extend_len}/2" | bc)"
                 extend_len="$(expr "${extend_len}" - 1)"
                 while [ "${extend_len}" -gt 0 ]
                 do
