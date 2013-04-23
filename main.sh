@@ -19,29 +19,28 @@ eval set -- "$ARGV"
 TEMP_PINYIN_TABLE='/tmp/pinyintable-$$.txt'
 REVERSE_HEX_ORDER='s/^[[:space:]]*\([[:xdigit:]]\{2\}\)[[:space:]]\([[:xdigit:]]\{2\}\)$/\2\1/g'
 
-cols_to_single_col() {
-    awk '{ \
-            for(i=1;i<=NF;i++) { \
-                printf "%s\n",$i; \
-            } \
-        }'
-}
 
-single_col_to_cols() {
-    awk '{ \
-            j=NR%'"${1}"'; \
-            if(j != 1) { \
-                printf OFS; \
-            } \
-            printf "%s",$1; \
-            if(j == 0) { \
-                printf ORS; \
-            } \
-        } \
-        END{ \
-            if(NR%'"${1}"' != 0) { \
-                printf ORS; \
-            } \
+reset_cols() {
+    awk 'BEGIN{
+            n=0;
+        }
+        {
+            for(i=1;i<=NF;i++) {
+                n++;
+                j=n%'"${1}"';
+                if(j != 1) {
+                    printf OFS;
+                }
+                printf $i;
+                if(j == 0) {
+                    printf ORS;
+                }
+            }
+        }
+        END{
+            if(n%'"${1}"' != 0) {
+                printf ORS;
+            }
         }'
 }
 
@@ -147,7 +146,7 @@ byte2str() {
 
 dict_info() {
     od -An -tx1 -j "${2}" -N "${3}" -v "${1}" | \
-        cols_to_single_col | single_col_to_cols 2 | \
+        reset_cols 2 | \
         sed -e "${REVERSE_HEX_ORDER}" \
             -e '/^0000$/d' | \
         tr '[:lower:]' '[:upper:]' | \
@@ -159,7 +158,7 @@ print_pinyin_table() {
     local len=''
     local pinyin=''
     od -An -tx1 -j 0x1544 -N 4324 -v "${1}" | \
-        cols_to_single_col | single_col_to_cols 2 | \
+        reset_cols 2 | \
         sed -e "${REVERSE_HEX_ORDER}" | \
         tr '[:lower:]' '[:upper:]' | \
         while read index
@@ -188,7 +187,7 @@ print_dict() {
     local extend_len=''
     local chinese_phrase_frequency=''
     od -An -tx1 -j 0x2628 -v "${1}" | \
-        cols_to_single_col | single_col_to_cols 2 | \
+        reset_cols 2 | \
         sed -e "${REVERSE_HEX_ORDER}" | \
         tr '[:lower:]' '[:upper:]' | \
         while read line
