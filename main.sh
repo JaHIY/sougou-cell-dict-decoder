@@ -31,7 +31,7 @@ reset_cols() {
                 if(j != 1) {
                     printf OFS;
                 }
-                printf $i;
+                printf "%s",$i;
                 if(j == 0) {
                     printf ORS;
                 }
@@ -206,7 +206,7 @@ print_dict() {
             done
             while [ "${homophone_amount}" -gt 0 ]
             do
-                printf "${pinyin}\n" | colrm 1 1
+                printf '%s\n' "${pinyin}" | colrm 1 1
                 read chinese_phrase_len
                 chinese_phrase_len="$(printf '%s\n' "obase=10;ibase=16;${chinese_phrase_len}/2" | bc)"
                 while [ "${chinese_phrase_len}" -gt 0 ]
