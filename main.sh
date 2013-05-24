@@ -16,7 +16,6 @@ fi
 
 eval set -- "$ARGV"
 
-TEMP_PINYIN_TABLE="$(mktemp --tmpdir pinyintable.XXXXXXXXXX)"
 REVERSE_HEX_ORDER='s/^[[:space:]]*\([[:xdigit:]]\{2\}\)[[:space:]]\([[:xdigit:]]\{2\}\)$/\2\1/g'
 
 
@@ -270,6 +269,7 @@ main() {
         done
     else
         trap 'clean_up_on_exit' HUP INT QUIT TERM
+        TEMP_PINYIN_TABLE="$(mktemp --tmpdir pinyintable.XXXXXXXXXX)"
         while true
         do
             print_pinyin_table "${1}" > "${TEMP_PINYIN_TABLE}"
