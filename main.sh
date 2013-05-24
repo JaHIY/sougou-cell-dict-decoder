@@ -16,7 +16,7 @@ fi
 
 eval set -- "$ARGV"
 
-TEMP_PINYIN_TABLE='/tmp/pinyintable-$$.txt'
+TEMP_PINYIN_TABLE="$(mktemp --tmpdir pinyintable.XXXXXXXXXX)"
 REVERSE_HEX_ORDER='s/^[[:space:]]*\([[:xdigit:]]\{2\}\)[[:space:]]\([[:xdigit:]]\{2\}\)$/\2\1/g'
 
 
@@ -235,8 +235,6 @@ print_dict() {
 
 main() {
     local list_flag=0
-    local my_umask='077'
-    local old_umask="$(umask)"
     trap 'abort_msg_on_exit' HUP INT QUIT TERM
     while true
     do
@@ -274,9 +272,7 @@ main() {
         trap 'clean_up_on_exit' HUP INT QUIT TERM
         while true
         do
-            umask "$my_umask"
             print_pinyin_table "${1}" > "${TEMP_PINYIN_TABLE}"
-            umask "$old_umask"
             print_dict "${1}"
             clean_up
             shift
