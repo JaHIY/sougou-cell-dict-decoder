@@ -269,7 +269,7 @@ main() {
         done
     else
         trap 'clean_up_on_exit' HUP INT QUIT TERM
-        TEMP_PINYIN_TABLE="$(mktemp --tmpdir pinyintable.XXXXXXXXXX)"
+        TEMP_PINYIN_TABLE="$(mktemp "${TMPDIR-/tmp}/pinyintable.XXXXXXXXXX")"
         while true
         do
             print_pinyin_table "${1}" > "${TEMP_PINYIN_TABLE}"
